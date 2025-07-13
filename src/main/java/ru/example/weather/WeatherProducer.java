@@ -17,7 +17,7 @@ public class WeatherProducer implements Runnable {
     private static final String BOOTSTRAP_SERVERS = "localhost:9092";
     private final KafkaProducer<String, WeatherData> producer;
     private final Random random = new Random();
-    private final List<String> cities = List.of("Москва", "Санкт-Петербург", "Тюмень", "Магадан", "Владивосток");
+    private final List<String> cities = List.of("Москва", "Санкт-Петербург", "Тюмень", "Магадан", "Чукотка");
     private final List<String> conditions = List.of("солнечно", "облачно", "дождь");
 
     private volatile boolean running = true;
@@ -43,8 +43,8 @@ public class WeatherProducer implements Runnable {
 
                 producer.send(record, (metadata, exception) -> {
                     if (exception == null) {
-                        System.out.printf("Отправлено: город=%s, температура=%.1f\n",
-                                data.getCity(), data.getTemperature());
+                        System.out.printf("Отправлено: город=%s, дата=%s, topic=%s, partition=%d\n",
+                                data.getCity(), data.getEventDate(), metadata.topic(), metadata.partition());
                     } else {
                         System.err.println("Ошибка отправки: " + exception.getMessage());
                     }
