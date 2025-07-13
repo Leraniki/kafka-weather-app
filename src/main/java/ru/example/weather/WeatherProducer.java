@@ -20,6 +20,8 @@ public class WeatherProducer implements Runnable {
     private final List<String> cities = List.of("Москва", "Санкт-Петербург", "Тюмень", "Магадан", "Владивосток");
     private final List<String> conditions = List.of("солнечно", "облачно", "дождь");
 
+    private volatile boolean running = true;
+
     public WeatherProducer() {
         Properties props = new Properties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
@@ -33,26 +35,26 @@ public class WeatherProducer implements Runnable {
     public void run() {
         System.out.println("WeatherProducer запущен. Отправка данных...");
         try {
-            for (int day = 0; day < 7; day++) {
-                LocalDate currentDate = LocalDate.now().plusDays(day);
-                for (String city : cities) {
-                    WeatherData data = generateRandomWeatherData(city, currentDate);
-                    ProducerRecord<String, WeatherData> record = new ProducerRecord<>(TOPIC, city, data);
+            while (running) {
+                String city = cities.get(random.nextInt(cities.size()));
+                WeatherData data = generateRandomWeatherData(city);
 
-                    producer.send(record, (metadata, exception) -> {
-                        if (exception == null) {
-                            System.out.printf("Отправлено: город = %s, дата = %s, topic = %s, partition = %d\n",
-                                    data.getCity(), data.getEventDate(), metadata.topic(), metadata.partition());
-                        } else {
-                            System.err.println("Ошибка отправки: " + exception.getMessage());
-                        }
-                    });
+                ProducerRecord<String, WeatherData> record = new ProducerRecord<>(TOPIC, city, data);
 
-                    TimeUnit.SECONDS.sleep(1);
-                }
+                producer.send(record, (metadata, exception) -> {
+                    if (exception == null) {
+                        System.out.printf("Отправлено: город=%s, температура=%.1f\n",
+                                data.getCity(), data.getTemperature());
+                    } else {
+                        System.err.println("Ошибка отправки: " + exception.getMessage());
+                    }
+                });
+
+                TimeUnit.MILLISECONDS.sleep(500);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            System.out.println("WeatherProducer был прерван.");
         } finally {
             producer.flush();
             producer.close();
@@ -60,10 +62,13 @@ public class WeatherProducer implements Runnable {
         }
     }
 
-    private WeatherData generateRandomWeatherData(String city, LocalDate date) {
-        // Температура от 0 до 35
+    public void stop() {
+        this.running = false;
+    }
+
+    private WeatherData generateRandomWeatherData(String city) {
+        LocalDate date = LocalDate.now();
         double temperature = random.nextInt(36);
-        // Случайное погодное условие
         String condition = conditions.get(random.nextInt(conditions.size()));
         return new WeatherData(city, temperature, condition, date);
     }
